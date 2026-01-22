@@ -20,6 +20,7 @@ class Landing_Inline_Any_URL_Safe {
     private string $meta_tpl    = '_li_tpl_id'; // NEW
     private string $meta_header_tpl = '_li_header_tpl_id';
     private string $meta_footer_tpl = '_li_footer_tpl_id';
+    private string $meta_noindex = '_li_noindex';
 
     /* ================= OPTIONS ================= */
 
@@ -88,6 +89,10 @@ class Landing_Inline_Any_URL_Safe {
         nocache_headers();
 
         $post = $posts[0];
+        $noindex = get_post_meta($post->ID, $this->meta_noindex, true) === '1';
+        if ($noindex) {
+            header('X-Robots-Tag: noindex, nofollow', true);
+        }
 
         /* ===== CSS TEMPLATE RESOLUTION ===== */
 
@@ -165,6 +170,7 @@ class Landing_Inline_Any_URL_Safe {
         echo
             (!empty($header_tpl_css) ? "<style id='li-header-template-css'>{$header_tpl_css}</style>" : '') .
             (!empty($footer_tpl_css) ? "<style id='li-footer-template-css'>{$footer_tpl_css}</style>" : '') .
+            ($noindex ? "<meta name='robots' content='noindex, nofollow'>" : '') .
             get_post_meta($post->ID, $this->meta_head, true) .
             $header_tpl_html .
             get_post_meta($post->ID, $this->meta_body, true) .
@@ -186,6 +192,7 @@ class Landing_Inline_Any_URL_Safe {
         add_meta_box('li_tpl', 'CSS Template', [$this,'box_template'], $this->post_type); // NEW
         add_meta_box('li_header_tpl', 'Header Template', [$this,'box_header_template'], $this->post_type);
         add_meta_box('li_footer_tpl', 'Footer Template', [$this,'box_footer_template'], $this->post_type);
+        add_meta_box('li_noindex', 'Indexing', [$this,'box_noindex'], $this->post_type);
     }
 
     public function box_url($p) {
@@ -264,13 +271,22 @@ class Landing_Inline_Any_URL_Safe {
         echo '</select>';
     }
 
+    public function box_noindex($p) {
+        $current = get_post_meta($p->ID, $this->meta_noindex, true);
+        echo '<input type="hidden" name="li_noindex" value="0">';
+        echo '<label><input type="checkbox" name="li_noindex" value="1" ' .
+            checked($current, '1', false) . '> Disable indexing (noindex)</label>';
+    }
+
     public function save_meta_boxes($id) {
 
-        foreach (['li_url','li_head','li_body','li_footer','li_css','li_tpl','li_header_tpl','li_footer_tpl'] as $f) {
+        foreach (['li_url','li_head','li_body','li_footer','li_css','li_tpl','li_header_tpl','li_footer_tpl','li_noindex'] as $f) {
             if (!isset($_POST[$f])) continue;
 
             if ($f === 'li_url') {
                 update_post_meta($id, '_li_url', $_POST[$f]);
+            } elseif ($f === 'li_noindex') {
+                update_post_meta($id, $this->meta_noindex, $_POST[$f] === '1' ? '1' : '0');
             } elseif ($f === 'li_tpl') {
                 update_post_meta($id, $this->meta_tpl, sanitize_key($_POST[$f]));
             } elseif ($f === 'li_header_tpl') {
@@ -691,6 +707,10 @@ class Landing_Inline_Any_URL_Safe {
         update_post_meta($id, $this->meta_body,   $d['body']   ?? '');
         update_post_meta($id, $this->meta_footer, $d['footer'] ?? '');
         update_post_meta($id, $this->meta_css,    $d['css']    ?? '');
+        if (array_key_exists('noindex', $d)) {
+            $noindex = filter_var($d['noindex'], FILTER_VALIDATE_BOOLEAN);
+            update_post_meta($id, $this->meta_noindex, $noindex ? '1' : '0');
+        }
 
         if (!empty($d['template'])) {
             update_post_meta($id, $this->meta_tpl, sanitize_key($d['template']));
