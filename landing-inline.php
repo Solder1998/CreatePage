@@ -48,6 +48,7 @@ class Landing_Inline_Any_URL_Safe {
         add_action('admin_post_li_save_templates', [$this, 'save_templates']);
 
         add_action('rest_api_init', [$this, 'register_ai_routes']);
+        add_filter('_wp_post_revision_meta_keys', [$this, 'revision_meta_keys']);
     }
 
     /* ================= POST TYPE ================= */
@@ -58,7 +59,7 @@ class Landing_Inline_Any_URL_Safe {
             'public'       => false,
             'show_ui'      => true,
             'menu_icon'    => 'dashicons-welcome-view-site',
-            'supports'     => ['title'],
+            'supports'     => ['title', 'revisions'],
             'rewrite'      => false,
         ]);
     }
@@ -265,6 +266,15 @@ class Landing_Inline_Any_URL_Safe {
     }
 
     public function save_meta_boxes($id) {
+        if (wp_is_post_autosave($id) || wp_is_post_revision($id)) {
+            return;
+        }
+
+        if (get_post_type($id) !== $this->post_type) {
+            return;
+        }
+
+        wp_save_post_revision($id);
 
         foreach (['li_url','li_head','li_body','li_footer','li_css','li_tpl','li_header_tpl','li_footer_tpl'] as $f) {
             if (!isset($_POST[$f])) continue;
@@ -676,17 +686,57 @@ class Landing_Inline_Any_URL_Safe {
         ]);
     }
 
+    public function revision_meta_keys($keys) {
+        $keys[] = '_li_url';
+        $keys[] = $this->meta_head;
+        $keys[] = $this->meta_body;
+        $keys[] = $this->meta_footer;
+        $keys[] = $this->meta_css;
+        $keys[] = $this->meta_tpl;
+        $keys[] = $this->meta_header_tpl;
+        $keys[] = $this->meta_footer_tpl;
+        return array_values(array_unique($keys));
+    }
+
     public function ai_create($r) {
 
         $d = $r->get_json_params();
+        $url = ltrim($d['url'] ?? '', '/');
+        if ($url === '') {
+            return new WP_Error('missing_url', 'URL is required', ['status' => 400]);
+        }
 
-        $id = wp_insert_post([
+        $existing = get_posts([
             'post_type'   => $this->post_type,
-            'post_title'  => sanitize_text_field($d['title'] ?? $d['url']),
-            'post_status' => !empty($d['publish']) ? 'publish' : 'draft',
+            'meta_query'  => [[
+                'key'   => '_li_url',
+                'value' => $url
+            ]],
+            'post_status' => 'any',
+            'numberposts' => 1
         ]);
 
-        update_post_meta($id, '_li_url', ltrim($d['url'], '/'));
+        $id = 0;
+        $post_status = !empty($d['publish']) ? 'publish' : 'draft';
+
+        if ($existing) {
+            $id = $existing[0]->ID;
+            $post_status = !empty($d['publish']) ? 'publish' : get_post_status($id);
+            wp_save_post_revision($id);
+            wp_update_post([
+                'ID'          => $id,
+                'post_title'  => sanitize_text_field($d['title'] ?? $url),
+                'post_status' => $post_status,
+            ]);
+        } else {
+            $id = wp_insert_post([
+                'post_type'   => $this->post_type,
+                'post_title'  => sanitize_text_field($d['title'] ?? $url),
+                'post_status' => $post_status,
+            ]);
+        }
+
+        update_post_meta($id, '_li_url', $url);
         update_post_meta($id, $this->meta_head,   $d['head']   ?? '');
         update_post_meta($id, $this->meta_body,   $d['body']   ?? '');
         update_post_meta($id, $this->meta_footer, $d['footer'] ?? '');
