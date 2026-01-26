@@ -187,6 +187,7 @@ class Landing_Inline_Any_URL_Safe {
         add_meta_box('li_tpl', 'CSS Template', [$this,'box_template'], $this->post_type); // NEW
         add_meta_box('li_header_tpl', 'Header Template', [$this,'box_header_template'], $this->post_type);
         add_meta_box('li_footer_tpl', 'Footer Template', [$this,'box_footer_template'], $this->post_type);
+        add_meta_box('li_revisions', 'История версий', [$this,'box_revisions'], $this->post_type, 'side', 'default');
     }
 
     public function box_url($p) {
@@ -263,6 +264,22 @@ class Landing_Inline_Any_URL_Safe {
                 esc_html($t['name']).'</option>';
         }
         echo '</select>';
+    }
+
+    public function box_revisions($p) {
+        $revisions = wp_get_post_revisions($p->ID);
+        if (empty($revisions)) {
+            echo '<p>Пока нет сохраненных версий.</p>';
+            return;
+        }
+
+        echo '<ul>';
+        foreach ($revisions as $revision) {
+            $title = wp_post_revision_title($revision, false);
+            $link = admin_url('revision.php?revision=' . $revision->ID);
+            echo '<li><a href="' . esc_url($link) . '">' . esc_html($title) . '</a></li>';
+        }
+        echo '</ul>';
     }
 
     public function save_meta_boxes($id) {
