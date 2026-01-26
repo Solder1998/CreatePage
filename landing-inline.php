@@ -49,6 +49,7 @@ class Landing_Inline_Any_URL_Safe {
 
         add_action('rest_api_init', [$this, 'register_ai_routes']);
         add_filter('_wp_post_revision_meta_keys', [$this, 'revision_meta_keys']);
+        add_filter('wp_save_post_revision_check_for_changes', [$this, 'force_revision_on_meta_save'], 10, 2);
     }
 
     /* ================= POST TYPE ================= */
@@ -717,6 +718,14 @@ class Landing_Inline_Any_URL_Safe {
         $keys[] = $this->meta_header_tpl;
         $keys[] = $this->meta_footer_tpl;
         return array_values(array_unique($keys));
+    }
+
+    public function force_revision_on_meta_save($check_for_changes, $post) {
+        if ($post instanceof WP_Post && $post->post_type === $this->post_type) {
+            return false;
+        }
+
+        return $check_for_changes;
     }
 
     public function ai_create($r) {
