@@ -266,6 +266,15 @@ class Landing_Inline_Any_URL_Safe {
     }
 
     public function save_meta_boxes($id) {
+        if (wp_is_post_autosave($id) || wp_is_post_revision($id)) {
+            return;
+        }
+
+        if (get_post_type($id) !== $this->post_type) {
+            return;
+        }
+
+        wp_save_post_revision($id);
 
         foreach (['li_url','li_head','li_body','li_footer','li_css','li_tpl','li_header_tpl','li_footer_tpl'] as $f) {
             if (!isset($_POST[$f])) continue;
