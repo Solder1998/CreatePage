@@ -49,7 +49,7 @@ class Landing_Inline_Any_URL_Safe {
 
         add_action('rest_api_init', [$this, 'register_ai_routes']);
         add_filter('_wp_post_revision_meta_keys', [$this, 'revision_meta_keys']);
-        add_filter('wp_save_post_revision_check_for_changes', [$this, 'force_revision_on_meta_save'], 10, 2);
+        add_filter('wp_save_post_revision_check_for_changes', [$this, 'force_revision_on_meta_save'], 10, 2); // ensure meta-only updates create revisions
     }
 
     /* ================= POST TYPE ================= */
